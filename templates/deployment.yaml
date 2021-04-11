@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{.Chart.Name}}
+  name: {{ include "tranmision.fullname" . }}
+  labels:
+    {{- include "tranmision.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tranmision.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "tranmision.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tranmision.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 9091
+              protocol: TCP
+            - name: http2
+              containerPort: 51413
+              protocol: TCP
+            - name: udp
+              containerPort: 51413
+              protocol: UDP
+          env:
+            - name: PASS
+              value: password
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: TRANSMISSION_WEB_HOME
+              value: /combustion-release/
+            - name: TZ
+              value: Europe/London
+            - name: USER
+              value: username
+          volumeMounts:
+            - mountPath: /config
+              name: {{.Chart.Name}}
+            - mountPath: /downloads
+              name: {{.Chart.Name}}
+            - mountPath: /watch
+              name: {{.Chart.Name}}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: {{.Chart.Name}}
+          persistentVolumeClaim:
+            claimName: {{.Values.persistence.pvcName}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
